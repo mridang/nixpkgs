@@ -1,0 +1,22 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.10.7/.schema/devbox.schema.json",
+  "packages": [
+    "github:NixOS/nixpkgs/nixos-24.05#nixVersions.nix_2_21",
+    "go",
+    "buf",
+    "alejandra",
+    "statix",
+    "deadnix",
+    "pre-commit"
+  ],
+  "env": {
+    "NIX_CONFIG": "experimental-features = nix-command flakes\n"
+  },
+  "shell": {
+    "scripts": {
+      "build": "nix build",
+      "fmt": "alejandra .",
+      "lint:nix": "statix check . && deadnix ."
+    }
+  }
+}

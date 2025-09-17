@@ -1,0 +1,29 @@
+{
+  "lockfile_version": "1",
+  "packages": {
+    "alejandra": {
+      "resolved": "github:NixOS/nixpkgs/75a52265bda7fd25e06e3a67dee3f0354e73243c#alejandra",
+      "source": "nixpkg"
+    },
+    "buf": {
+      "resolved": "github:NixOS/nixpkgs/75a52265bda7fd25e06e3a67dee3f0354e73243c#buf",
+      "source": "nixpkg"
+    },
+    "deadnix": {
+      "resolved": "github:NixOS/nixpkgs/75a52265bda7fd25e06e3a67dee3f0354e73243c#deadnix",
+      "source": "nixpkg"
+    },
+    "go": {
+      "resolved": "github:NixOS/nixpkgs/75a52265bda7fd25e06e3a67dee3f0354e73243c#go",
+      "source": "nixpkg"
+    },
+    "pre-commit": {
+      "resolved": "github:NixOS/nixpkgs/75a52265bda7fd25e06e3a67dee3f0354e73243c#pre-commit",
+      "source": "nixpkg"
+    },
+    "statix": {
+      "resolved": "github:NixOS/nixpkgs/75a52265bda7fd25e06e3a67dee3f0354e73243c#statix",
+      "source": "nixpkg"
+    }
+  }
+}
