@@ -1,13 +1,19 @@
-{ lib, buildGoModule, fetchFromGitHub }:
-# pass `go` in the argset below
-{ owner, repo, version
-, go                         # <- REQUIRED: e.g., pkgsUnstable.go_1_24
-, subPackages ? [ "." ]
-, ldflags ? [ "-s" "-w" ]
-, cgoEnabled ? "0"
-, doCheck ? false
+{
+  lib,
+  buildGoModule,
+  fetchFromGitHub,
 }:
-
+# pass `go` in the argset below
+{
+  owner,
+  repo,
+  version,
+  go, # <- REQUIRED: e.g., pkgsUnstable.go_1_24
+  subPackages ? ["."],
+  ldflags ? ["-s" "-w"],
+  cgoEnabled ? "0",
+  doCheck ? false,
+}:
 buildGoModule {
   pname = repo;
   inherit version subPackages ldflags doCheck;
@@ -16,11 +22,11 @@ buildGoModule {
   src = fetchFromGitHub {
     inherit owner repo;
     rev = version;
-    hash = "sha256-7+8+DpObBxJZihy0kHOReDIlfZGRMQy6yUkGh864pJk=";  # you filled this already
+    hash = "sha256-7+8+DpObBxJZihy0kHOReDIlfZGRMQy6yUkGh864pJk="; # you filled this already
   };
 
   # will fail once and print the real value; paste it here
-   vendorHash = "sha256-ubcJP5q70F4mTqx+f8V+lCfjiGHxOvdPVaUwhVLmhb8=";
+  vendorHash = "sha256-ubcJP5q70F4mTqx+f8V+lCfjiGHxOvdPVaUwhVLmhb8=";
 
   # ensure Go 1.24 is used
   go = go;
