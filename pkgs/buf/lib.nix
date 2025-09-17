@@ -18,7 +18,6 @@ buildGoModule {
 
   meta = with lib; {
     description = "Buf plugin ${pname}";
-    homepage = "https://github.com/${pname}";
     license = licenses.mit;
     mainProgram = pname;
     platforms = platforms.unix ++ platforms.darwin;

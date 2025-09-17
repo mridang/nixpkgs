@@ -6,40 +6,34 @@
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
+  # 'self' is not used, so omit it
   outputs = {
-    self,
     nixpkgs,
     nixpkgs-unstable,
+    ...
   }: let
-    systems = [
-      "x86_64-linux"
-      "aarch64-linux"
-      "x86_64-darwin"
-      "aarch64-darwin"
-    ];
+    systems = ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
   in {
     packages = nixpkgs.lib.genAttrs systems (
       system: let
         pkgs = import nixpkgs {inherit system;};
-        pkgsUnstable = import nixpkgs-unstable {inherit system;};
-      in {
+        unstable = import nixpkgs-unstable {inherit system;};
+      in rec {
         protoc-gen-connect-openapi = pkgs.callPackage ./pkgs/buf/protoc-gen-connect-openapi {
-          buildGoModule = pkgsUnstable.buildGoModule;
-          go_1_24 = pkgsUnstable.go_1_24;
+          inherit (unstable) buildGoModule go_1_24;
         };
 
-        default = self.packages.${system}.protoc-gen-connect-openapi;
+        default = protoc-gen-connect-openapi;
       }
     );
 
-    overlays.default = final: prev: {
+    # keep a single overlay; underscore unused 'final'
+    overlays.default = _final: prev: let
+      unstable = import nixpkgs-unstable {inherit (prev.stdenv) system;};
+    in {
       protoc-gen-connect-openapi = (import ./pkgs/buf/protoc-gen-connect-openapi) {
-        lib = prev.lib;
-        buildGoModule =
-          (import nixpkgs-unstable {system = prev.stdenv.system;}).buildGoModule;
-        fetchFromGitHub = prev.fetchFromGitHub;
-        go_1_24 =
-          (import nixpkgs-unstable {system = prev.stdenv.system;}).go_1_24;
+        inherit (prev) lib fetchFromGitHub;
+        inherit (unstable) buildGoModule go_1_24;
       };
     };
   };

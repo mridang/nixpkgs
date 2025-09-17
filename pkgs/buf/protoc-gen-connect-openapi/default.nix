@@ -4,9 +4,9 @@
   fetchFromGitHub,
   go_1_24,
 }: let
-  mkBufPlugin = import ../lib.nix {inherit lib buildGoModule;};
+  mk = import ../lib.nix {inherit lib buildGoModule;};
 in
-  mkBufPlugin {
+  mk {
     pname = "protoc-gen-connect-openapi";
     version = "v0.21.2";
     go = go_1_24;
@@ -15,8 +15,8 @@ in
       owner = "sudorandom";
       repo = "protoc-gen-connect-openapi";
       rev = "v0.21.2";
-      hash = "sha256-7+8+DpObBxJZihy0kHOReDIlfZGRMQy6yUkGh864pJk="; # source tarball hash
+      hash = "sha256-7+8+DpObBxJZihy0kHOReDIlfZGRMQy6yUkGh864pJk=";
     };
 
-    vendorHash = "sha256-ubcJP5q70F4mTqx+f8V+lCfjiGHxOvdPVaUwhVLmhb8="; # Go modules hash
+    vendorHash = "sha256-ubcJP5q70F4mTqx+f8V+lCfjiGHxOvdPVaUwhVLmhb8=";
   }
