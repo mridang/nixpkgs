@@ -14,7 +14,7 @@
   },
   "shell": {
     "scripts": {
-      "build": "nix build",
+      "build": "nix build --rebuild",
       "fmt": "alejandra .",
       "lint:nix": "statix check . && deadnix ."
     }
