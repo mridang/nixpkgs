@@ -23,6 +23,8 @@
           inherit (unstable) buildGoModule go_1_24;
         };
 
+        qodana = pkgs.callPackage ./pkgs/qodana {};
+
         default = protoc-gen-connect-openapi;
       }
     );
@@ -35,6 +37,8 @@
         inherit (prev) lib fetchFromGitHub;
         inherit (unstable) buildGoModule go_1_24;
       };
+
+      qodana = prev.callPackage ./pkgs/qodana {};
     };
   };
 }
