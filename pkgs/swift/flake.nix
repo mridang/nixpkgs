@@ -51,6 +51,9 @@
             installPhase = ''
               cp -R . $out
               mkdir -p $out/bin
+              for b in swift swiftc; do
+                ln -s $out/usr/bin/$b $out/bin/$b
+              done
             '' + lib.optionalString stdenv.isLinux ''
               rpath=$out/usr/lib
               rpath=$rpath:$out/usr/lib/swift/host
@@ -66,18 +69,14 @@
               rpath=$rpath:${pkgs.libedit}/lib
 
               interp=$(cat $NIX_CC/nix-support/dynamic-linker)
-              find $out/usr/bin -type f -perm -0100 \
-                -exec patchelf --interpreter "$interp" --set-rpath "$rpath" {} \;
+              # Guard against non-ELF files (e.g. shell scripts): patchelf exits
+              # non-zero on them and set -e would abort the build.
+              find $out/usr/bin -type f -perm -0100 | while IFS= read -r f; do
+                patchelf --print-interpreter "$f" &>/dev/null || continue
+                patchelf --interpreter "$interp" --set-rpath "$rpath" "$f"
+              done
               find $out/usr/lib -name "*.so" \
                 -exec patchelf --set-rpath "$rpath" --force-rpath {} \;
-
-              for b in swift swiftc; do
-                ln -s $out/usr/bin/$b $out/bin/$b
-              done
-            '' + lib.optionalString stdenv.isDarwin ''
-              for b in swift swiftc; do
-                ln -s $out/usr/bin/$b $out/bin/$b
-              done
             '';
 
             # Running swift --version inside the Nix macOS sandbox hangs
