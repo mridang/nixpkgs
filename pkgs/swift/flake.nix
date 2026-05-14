@@ -51,9 +51,6 @@
             installPhase = ''
               cp -R . $out
               mkdir -p $out/bin
-              for b in swift swiftc; do
-                ln -s $out/usr/bin/$b $out/bin/$b
-              done
             '' + lib.optionalString stdenv.isLinux ''
               rpath=$out/usr/lib
               rpath=$rpath:$out/usr/lib/swift/host
@@ -77,6 +74,23 @@
               done
               find $out/usr/lib -name "*.so" \
                 -exec patchelf --set-rpath "$rpath" --force-rpath {} \;
+
+              for b in swift swiftc; do
+                ln -s $out/usr/bin/$b $out/bin/$b
+              done
+            '' + lib.optionalString stdenv.isDarwin ''
+              for b in swiftc swift-build swift-test swift-run swift-package swift-sdk; do
+                ln -s $out/usr/bin/$b $out/bin/$b 2>/dev/null || true
+              done
+              # swift-driver uses Xcode toolchain discovery and would pick up the
+              # system swift-frontend (6.1.2) instead of the Nix-store one.
+              # SWIFT_EXEC overrides that discovery to point at our swift-frontend.
+              cat > $out/bin/swift << 'WRAPPER'
+#!/bin/bash
+export SWIFT_EXEC="$(cd "$(dirname "$0")/../usr/bin" && pwd)/swift-frontend"
+exec "$(cd "$(dirname "$0")/../usr/bin" && pwd)/swift-driver" "$@"
+WRAPPER
+              chmod +x $out/bin/swift
             '';
 
             # Running swift --version inside the Nix macOS sandbox hangs
