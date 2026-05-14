@@ -88,7 +88,7 @@
               cat > $out/bin/swift << 'WRAPPER'
 #!/bin/bash
 export SWIFT_EXEC="$(cd "$(dirname "$0")/../usr/bin" && pwd)/swift-frontend"
-exec "$(cd "$(dirname "$0")/../usr/bin" && pwd)/swift-driver" "$@"
+exec -a swift "$(cd "$(dirname "$0")/../usr/bin" && pwd)/swift-driver" "$@"
 WRAPPER
               chmod +x $out/bin/swift
             '';
