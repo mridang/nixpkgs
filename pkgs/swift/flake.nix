@@ -36,7 +36,7 @@
 
           swift = stdenv.mkDerivation {
             inherit src version;
-            name = "swift";
+            pname = "swift";
 
             nativeBuildInputs = lib.optionals stdenv.isLinux  [ pkgs.patchelf ]
                              ++ lib.optionals stdenv.isDarwin [ pkgs.xar pkgs.cpio ];
@@ -57,7 +57,6 @@
               rpath=$rpath:$out/usr/lib/swift/host/compiler
               rpath=$rpath:$out/usr/lib/swift/linux
               rpath=$rpath:${pkgs.stdenv.cc.cc.lib}/lib
-              rpath=$rpath:${pkgs.gcc.cc.lib}/lib
               rpath=$rpath:${pkgs.sqlite.out}/lib
               rpath=$rpath:${pkgs.ncurses}/lib
               rpath=$rpath:${pkgs.libuuid.lib}/lib
