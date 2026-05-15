@@ -51,6 +51,7 @@
 
             installPhase = ''
               cp -R . $out
+              mkdir -p $out/nix-support
             '' + lib.optionalString stdenv.isLinux ''
               rpath=$out/usr/lib
               rpath=$rpath:$out/usr/lib/swift/host
@@ -87,6 +88,36 @@
               # add -Xlinker -rpath flags that swift-frontend rejects.
               ln -sfn $out/usr/bin $out/bin
               ln -sfn $out/usr/lib $out/lib
+
+              # Setup hook: sourced automatically by Nix whenever this package
+              # is in buildInputs of any mkShell (including devbox-generated ones).
+              #
+              # pkgs.mkShell activates stdenv.cc — the Nix C compiler wrapper —
+              # even when you only asked for a pre-built Swift binary. That wrapper:
+              #   1. Exports NIX_CC / NIX_BINTOOLS / NIX_LDFLAGS / … which corrupt
+              #      the macOS SDK paths that Apple's Swift driver discovers on its own.
+              #   2. Prepends clang-wrapper and cctools-binutils bin dirs to PATH,
+              #      shadowing /usr/bin/ld with a Nix wrapper that can't find libc++.tbd.
+              #   3. Leaves swiftlint unable to dlopen sourcekitdInProc.framework
+              #      because DYLD_FRAMEWORK_PATH is not set.
+              # All three are undone here so consumers get a clean environment
+              # without any workarounds in their own shell config.
+              cat > $out/nix-support/setup-hook <<'EOF'
+              # 1. Undo Nix CC wrapper environment variables.
+              unset NIX_CC NIX_CC_WRAPPER_TARGET_HOST_aarch64_apple_darwin
+              unset NIX_BINTOOLS NIX_BINTOOLS_WRAPPER_TARGET_HOST_aarch64_apple_darwin
+              unset NIX_CFLAGS_COMPILE NIX_LDFLAGS NIX_HARDENING_ENABLE
+              unset NIX_ENFORCE_NO_NATIVE NIX_DONT_SET_RPATH NIX_IGNORE_LD_THROUGH_GCC
+
+              # 2. Remove Nix CC wrapper bin dirs so /usr/bin/ld is used for linking.
+              PATH=$(echo "$PATH" | tr ':' '\n' | grep -Ev 'clang-wrapper|cctools-binutils' | tr '\n' ':' | sed 's/:$//')
+              export PATH
+
+              # 3. Expose SourceKit framework so swiftlint can dlopen it at runtime.
+              if command -v xcode-select >/dev/null 2>&1; then
+                export DYLD_FRAMEWORK_PATH="$(xcode-select -p)/usr/lib''${DYLD_FRAMEWORK_PATH:+:''${DYLD_FRAMEWORK_PATH}}"
+              fi
+              EOF
             '';
 
             # Running swift --version inside the Nix macOS sandbox hangs
