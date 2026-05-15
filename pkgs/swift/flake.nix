@@ -114,11 +114,16 @@
                 unset NIX_CFLAGS_COMPILE NIX_LDFLAGS NIX_HARDENING_ENABLE
                 unset NIX_DONT_SET_RPATH NIX_NO_SELF_RPATH NIX_IGNORE_LD_THROUGH_GCC
 
-                # 2. Remove Nix CC wrapper bin dirs so /usr/bin/ld is used for linking.
-                PATH=$(echo "$PATH" | tr ':' '\n' \
-                  | grep -Ev 'clang-wrapper|cctools-binutils' \
-                  | tr '\n' ':' | sed 's/:$//')
-                export PATH
+                # 2. Teach devbox to filter the CC wrappers from PATH.
+                #    devbox removes PATH entries whose prefix matches any buildInputs
+                #    store path.  NIX_CC / NIX_BINTOOLS are the store paths of the two
+                #    wrapper derivations whose /bin dirs shadow the system linker; adding
+                #    them here causes devbox's computeEnv to strip them without an
+                #    init_hook.  (Direct PATH mutation via envHostTargetHooks is not
+                #    preserved in the nix print-dev-env JSON output because PATH is
+                #    reconstructed from packages after all hooks have run.)
+                buildInputs="${buildInputs:+$buildInputs }${NIX_CC:+$NIX_CC }${NIX_BINTOOLS:+$NIX_BINTOOLS}"
+                export buildInputs
 
                 # 3. Expose SourceKit framework so swiftlint can dlopen it.
                 #    Use path probing — not xcode-select — because /usr/bin is absent
