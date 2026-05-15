@@ -127,7 +127,7 @@
                   "/Library/Developer/CommandLineTools/usr/lib" \
                   "/Applications/Xcode.app/Contents/Developer/usr/lib"; do
                   if [ -d "$_d/sourcekitdInProc.framework" ]; then
-                    export DYLD_FRAMEWORK_PATH="$_d${DYLD_FRAMEWORK_PATH:+:${DYLD_FRAMEWORK_PATH}}"
+                    export DYLD_FRAMEWORK_PATH="$_d''${DYLD_FRAMEWORK_PATH:+:''${DYLD_FRAMEWORK_PATH}}"
                     break
                   fi
                 done
