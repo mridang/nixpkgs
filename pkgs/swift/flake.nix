@@ -91,7 +91,15 @@
               # resolves to $out/lib → $out/usr/lib/… correctly (argv[0] is the
               # real store path, not the wrapper).
               mkdir -p $out/bin
-              for b in swift swiftc; do
+              # Every usr/bin entry gets a thin wrapper — not just swift/swiftc.
+              # Tools like swift-package, swift-driver, swift-build, swift-test,
+              # and swift-run can all drive a link step when called directly, so
+              # they all need the Nix clang/cctools stripped from PATH.
+              # .cfg files (musl cross-compilation stubs) are not executables;
+              # skip them so we don't accidentally wrap a text file.
+              for f in "$out/usr/bin/"*; do
+                b="$(basename "$f")"
+                case "$b" in *.cfg) continue;; esac
                 cat > "$out/bin/$b" << 'SWIFTWRAP'
 #!/bin/sh
 export PATH=$(echo "$PATH" | tr ':' '\n' | grep -Ev '/nix/store/[a-z0-9]+-clang[- /]|/nix/store/[a-z0-9]+-cctools-binutils' | tr '\n' ':' | sed 's/:$//')
@@ -99,11 +107,6 @@ unset NIX_CFLAGS_COMPILE NIX_LDFLAGS NIX_HARDENING_ENABLE
 SWIFTWRAP
                 echo "exec $out/usr/bin/$b \"\$@\"" >> "$out/bin/$b"
                 chmod +x "$out/bin/$b"
-              done
-              # Symlink every other usr/bin/* binary into bin/ unchanged.
-              for f in "$out/usr/bin/"*; do
-                b="$(basename "$f")"
-                [ -e "$out/bin/$b" ] || ln -s "$f" "$out/bin/$b"
               done
               ln -sfn $out/usr/lib $out/lib
 
