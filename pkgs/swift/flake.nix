@@ -122,7 +122,7 @@
                 #    init_hook.  (Direct PATH mutation via envHostTargetHooks is not
                 #    preserved in the nix print-dev-env JSON output because PATH is
                 #    reconstructed from packages after all hooks have run.)
-                buildInputs="${buildInputs:+$buildInputs }${NIX_CC:+$NIX_CC }${NIX_BINTOOLS:+$NIX_BINTOOLS}"
+                buildInputs="''${buildInputs:+$buildInputs }''${NIX_CC:+$NIX_CC }''${NIX_BINTOOLS:+$NIX_BINTOOLS}"
                 export buildInputs
 
                 # 3. Expose SourceKit framework so swiftlint can dlopen it.
