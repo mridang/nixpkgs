@@ -94,7 +94,7 @@
               for b in swift swiftc; do
                 cat > "$out/bin/$b" << 'SWIFTWRAP'
 #!/bin/sh
-export PATH=$(echo "$PATH" | tr ':' '\n' | grep -Ev '/clang-wrapper-|/cctools-binutils-darwin-wrapper-' | tr '\n' ':' | sed 's/:$//')
+export PATH=$(echo "$PATH" | tr ':' '\n' | grep -Ev '/nix/store/[a-z0-9]+-clang[- /]|/nix/store/[a-z0-9]+-cctools-binutils' | tr '\n' ':' | sed 's/:$//')
 unset NIX_CFLAGS_COMPILE NIX_LDFLAGS NIX_HARDENING_ENABLE
 SWIFTWRAP
                 echo "exec $out/usr/bin/$b \"\$@\"" >> "$out/bin/$b"
