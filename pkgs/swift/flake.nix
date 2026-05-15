@@ -46,6 +46,7 @@
             unpackPhase = lib.optionalString stdenv.isDarwin ''
               xar -xf $src
               zcat < swift-${version}-osx-package.pkg/Payload | cpio -i
+              find . -name '._*' -delete
             '';
 
             installPhase = ''
