@@ -87,8 +87,8 @@
               # SWIFT_EXEC overrides that discovery to point at our swift-frontend.
               cat > $out/bin/swift << 'WRAPPER'
 #!/bin/bash
-export SWIFT_EXEC="$(cd "$(dirname "$0")/../usr/bin" && pwd)/swift-frontend"
-exec -a swift "$(cd "$(dirname "$0")/../usr/bin" && pwd)/swift-driver" "$@"
+_dir="$(cd "$(dirname "$0")/../usr/bin" && pwd)"
+SWIFT_EXEC="$_dir/swift-frontend" exec -a swift "$_dir/swift-driver" "$@"
 WRAPPER
               chmod +x $out/bin/swift
             '';
