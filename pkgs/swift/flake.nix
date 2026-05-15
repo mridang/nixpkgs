@@ -50,7 +50,6 @@
 
             installPhase = ''
               cp -R . $out
-              mkdir -p $out/bin
             '' + lib.optionalString stdenv.isLinux ''
               rpath=$out/usr/lib
               rpath=$rpath:$out/usr/lib/swift/host
@@ -79,18 +78,14 @@
                 ln -s $out/usr/bin/$b $out/bin/$b
               done
             '' + lib.optionalString stdenv.isDarwin ''
-              for b in swiftc swift-build swift-test swift-run swift-package swift-sdk; do
-                ln -s $out/usr/bin/$b $out/bin/$b 2>/dev/null || true
-              done
-              # swift-driver uses Xcode toolchain discovery and would pick up the
-              # system swift-frontend (6.1.2) instead of the Nix-store one.
-              # SWIFT_EXEC overrides that discovery to point at our swift-frontend.
-              cat > $out/bin/swift << 'WRAPPER'
-#!/bin/bash
-_dir="$(cd "$(dirname "$0")/../usr/bin" && pwd)"
-SWIFT_EXEC="$_dir/swift-frontend" exec -a swift "$_dir/swift-driver" "$@"
-WRAPPER
-              chmod +x $out/bin/swift
+              # Expose usr/bin and usr/lib directly as bin and lib so that SPM
+              # can locate libPackageDescription via the expected relative path:
+              #   <swift-binary-dir>/../lib/swift/pm/ManifestAPI/libPackageDescription.dylib
+              # When swift lives in $out/usr/bin, that resolves to $out/usr/lib/... which
+              # exists.  A separate $out/bin wrapper breaks this lookup and causes SPM to
+              # add -Xlinker -rpath flags that swift-frontend rejects.
+              ln -sfn $out/usr/bin $out/bin
+              ln -sfn $out/usr/lib $out/lib
             '';
 
             # Running swift --version inside the Nix macOS sandbox hangs
