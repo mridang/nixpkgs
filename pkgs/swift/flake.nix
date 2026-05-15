@@ -80,54 +80,47 @@
                 ln -s $out/usr/bin/$b $out/bin/$b
               done
             '' + lib.optionalString stdenv.isDarwin ''
-              # Expose usr/bin and usr/lib directly as bin and lib so that SPM
-              # can locate libPackageDescription via the expected relative path:
+              # Create bin/ as a real directory.  swift and swiftc get thin
+              # wrapper scripts that remove the Nix CC-wrapper bin dirs from PATH
+              # before exec-ing the real binary.  This prevents the Nix ld wrapper
+              # (which cannot locate libc++.tbd in the macOS SDK) from being used
+              # when swiftc links test executables — without requiring an init_hook
+              # in devbox.json.  exec uses the absolute store path so that SPM's
+              # libPackageDescription relative-path lookup
               #   <swift-binary-dir>/../lib/swift/pm/ManifestAPI/libPackageDescription.dylib
-              # When swift lives in $out/usr/bin, that resolves to $out/usr/lib/... which
-              # exists.  A separate $out/bin wrapper breaks this lookup and causes SPM to
-              # add -Xlinker -rpath flags that swift-frontend rejects.
-              ln -sfn $out/usr/bin $out/bin
+              # resolves to $out/lib → $out/usr/lib/… correctly (argv[0] is the
+              # real store path, not the wrapper).
+              mkdir -p $out/bin
+              for b in swift swiftc; do
+                cat > "$out/bin/$b" << 'SWIFTWRAP'
+#!/bin/sh
+export PATH=$(echo "$PATH" | tr ':' '\n' | grep -Ev '/clang-wrapper-|/cctools-binutils-darwin-wrapper-' | tr '\n' ':' | sed 's/:$//')
+unset NIX_CFLAGS_COMPILE NIX_LDFLAGS NIX_HARDENING_ENABLE
+SWIFTWRAP
+                echo "exec $out/usr/bin/$b \"\$@\"" >> "$out/bin/$b"
+                chmod +x "$out/bin/$b"
+              done
+              # Symlink every other usr/bin/* binary into bin/ unchanged.
+              for f in "$out/usr/bin/"*; do
+                b="$(basename "$f")"
+                [ -e "$out/bin/$b" ] || ln -s "$f" "$out/bin/$b"
+              done
               ln -sfn $out/usr/lib $out/lib
 
               # Setup hook: sourced automatically by Nix when this package is in
               # buildInputs of any mkShell (including devbox-generated ones).
-              #
-              # pkgs.mkShell activates stdenv.cc (the Nix CC wrapper) even when only
-              # a pre-built Swift binary is requested.  That wrapper:
-              #   1. Prepends clang-wrapper and cctools-binutils bin dirs to PATH,
-              #      shadowing /usr/bin/ld with a wrapper that can't find libc++.tbd.
-              #   2. Registers ccWrapper_addCVars / bintoolsWrapper_addLDVars in
-              #      envHostTargetHooks which later set NIX_CFLAGS_COMPILE / NIX_LDFLAGS,
-              #      corrupting the macOS SDK paths Swift discovers on its own.
-              #   3. Leaves DYLD_FRAMEWORK_PATH unset, preventing swiftlint from
-              #      dlopen-ing sourcekitdInProc.framework at startup.
-              #
-              # Fix: define swiftFixupCCWrapper and append it to envHostTargetHooks.
-              # Because this setup hook runs AFTER the CC wrapper's setup hook
-              # (buildInputs are processed after nativeBuildInputs), our entry is
-              # appended after ccWrapper_addCVars / bintoolsWrapper_addLDVars in the
-              # array.  Nix calls array entries in order, so our cleanup fires last
-              # and wins — no init_hook in devbox.json required.
+              # Clears the CC-wrapper env vars that corrupt Swift SDK detection,
+              # and sets DYLD_FRAMEWORK_PATH so swiftlint can dlopen SourceKit.
               cat > $out/nix-support/setup-hook <<'EOF'
               swiftFixupCCWrapper() {
-                # 1. Clear compiler/linker flags set by the CC wrapper's envHostTargetHooks.
+                # Clear compiler/linker flags injected by the CC wrapper's
+                # envHostTargetHooks (ccWrapper_addCVars, bintoolsWrapper_addLDVars).
                 unset NIX_CFLAGS_COMPILE NIX_LDFLAGS NIX_HARDENING_ENABLE
                 unset NIX_DONT_SET_RPATH NIX_NO_SELF_RPATH NIX_IGNORE_LD_THROUGH_GCC
 
-                # 2. Teach devbox to filter the CC wrappers from PATH.
-                #    devbox removes PATH entries whose prefix matches any buildInputs
-                #    store path.  NIX_CC / NIX_BINTOOLS are the store paths of the two
-                #    wrapper derivations whose /bin dirs shadow the system linker; adding
-                #    them here causes devbox's computeEnv to strip them without an
-                #    init_hook.  (Direct PATH mutation via envHostTargetHooks is not
-                #    preserved in the nix print-dev-env JSON output because PATH is
-                #    reconstructed from packages after all hooks have run.)
-                buildInputs="''${buildInputs:+$buildInputs }''${NIX_CC:+$NIX_CC }''${NIX_BINTOOLS:+$NIX_BINTOOLS}"
-                export buildInputs
-
-                # 3. Expose SourceKit framework so swiftlint can dlopen it.
-                #    Use path probing — not xcode-select — because /usr/bin is absent
-                #    from PATH during nix print-dev-env evaluation.
+                # Expose SourceKit so swiftlint can dlopen sourcekitdInProc.
+                # Probe the filesystem — not xcode-select — because /usr/bin is
+                # absent from PATH during nix print-dev-env evaluation.
                 for _d in \
                   "/Library/Developer/CommandLineTools/usr/lib" \
                   "/Applications/Xcode.app/Contents/Developer/usr/lib"; do
@@ -139,8 +132,8 @@
                 unset _d
               }
 
-              # Append to envHostTargetHooks so swiftFixupCCWrapper is called
-              # AFTER ccWrapper_addCVars and bintoolsWrapper_addLDVars.
+              # Append AFTER ccWrapper_addCVars / bintoolsWrapper_addLDVars so
+              # our cleanup fires last and wins.
               envHostTargetHooks+=(swiftFixupCCWrapper)
               EOF
             '';
