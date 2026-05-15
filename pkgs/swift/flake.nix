@@ -89,34 +89,54 @@
               ln -sfn $out/usr/bin $out/bin
               ln -sfn $out/usr/lib $out/lib
 
-              # Setup hook: sourced automatically by Nix whenever this package
-              # is in buildInputs of any mkShell (including devbox-generated ones).
+              # Setup hook: sourced automatically by Nix when this package is in
+              # buildInputs of any mkShell (including devbox-generated ones).
               #
-              # pkgs.mkShell activates stdenv.cc — the Nix C compiler wrapper —
-              # even when you only asked for a pre-built Swift binary. That wrapper:
-              #   1. Exports NIX_CC / NIX_BINTOOLS / NIX_LDFLAGS / … which corrupt
-              #      the macOS SDK paths that Apple's Swift driver discovers on its own.
-              #   2. Prepends clang-wrapper and cctools-binutils bin dirs to PATH,
-              #      shadowing /usr/bin/ld with a Nix wrapper that can't find libc++.tbd.
-              #   3. Leaves swiftlint unable to dlopen sourcekitdInProc.framework
-              #      because DYLD_FRAMEWORK_PATH is not set.
-              # All three are undone here so consumers get a clean environment
-              # without any workarounds in their own shell config.
+              # pkgs.mkShell activates stdenv.cc (the Nix CC wrapper) even when only
+              # a pre-built Swift binary is requested.  That wrapper:
+              #   1. Prepends clang-wrapper and cctools-binutils bin dirs to PATH,
+              #      shadowing /usr/bin/ld with a wrapper that can't find libc++.tbd.
+              #   2. Registers ccWrapper_addCVars / bintoolsWrapper_addLDVars in
+              #      envHostTargetHooks which later set NIX_CFLAGS_COMPILE / NIX_LDFLAGS,
+              #      corrupting the macOS SDK paths Swift discovers on its own.
+              #   3. Leaves DYLD_FRAMEWORK_PATH unset, preventing swiftlint from
+              #      dlopen-ing sourcekitdInProc.framework at startup.
+              #
+              # Fix: define swiftFixupCCWrapper and append it to envHostTargetHooks.
+              # Because this setup hook runs AFTER the CC wrapper's setup hook
+              # (buildInputs are processed after nativeBuildInputs), our entry is
+              # appended after ccWrapper_addCVars / bintoolsWrapper_addLDVars in the
+              # array.  Nix calls array entries in order, so our cleanup fires last
+              # and wins — no init_hook in devbox.json required.
               cat > $out/nix-support/setup-hook <<'EOF'
-              # 1. Undo Nix CC wrapper environment variables.
-              unset NIX_CC NIX_CC_WRAPPER_TARGET_HOST_aarch64_apple_darwin
-              unset NIX_BINTOOLS NIX_BINTOOLS_WRAPPER_TARGET_HOST_aarch64_apple_darwin
-              unset NIX_CFLAGS_COMPILE NIX_LDFLAGS NIX_HARDENING_ENABLE
-              unset NIX_ENFORCE_NO_NATIVE NIX_DONT_SET_RPATH NIX_IGNORE_LD_THROUGH_GCC
+              swiftFixupCCWrapper() {
+                # 1. Clear compiler/linker flags set by the CC wrapper's envHostTargetHooks.
+                unset NIX_CFLAGS_COMPILE NIX_LDFLAGS NIX_HARDENING_ENABLE
+                unset NIX_DONT_SET_RPATH NIX_NO_SELF_RPATH NIX_IGNORE_LD_THROUGH_GCC
 
-              # 2. Remove Nix CC wrapper bin dirs so /usr/bin/ld is used for linking.
-              PATH=$(echo "$PATH" | tr ':' '\n' | grep -Ev 'clang-wrapper|cctools-binutils' | tr '\n' ':' | sed 's/:$//')
-              export PATH
+                # 2. Remove Nix CC wrapper bin dirs so /usr/bin/ld is used for linking.
+                PATH=$(echo "$PATH" | tr ':' '\n' \
+                  | grep -Ev 'clang-wrapper|cctools-binutils' \
+                  | tr '\n' ':' | sed 's/:$//')
+                export PATH
 
-              # 3. Expose SourceKit framework so swiftlint can dlopen it at runtime.
-              if command -v xcode-select >/dev/null 2>&1; then
-                export DYLD_FRAMEWORK_PATH="$(xcode-select -p)/usr/lib''${DYLD_FRAMEWORK_PATH:+:''${DYLD_FRAMEWORK_PATH}}"
-              fi
+                # 3. Expose SourceKit framework so swiftlint can dlopen it.
+                #    Use path probing — not xcode-select — because /usr/bin is absent
+                #    from PATH during nix print-dev-env evaluation.
+                for _d in \
+                  "/Library/Developer/CommandLineTools/usr/lib" \
+                  "/Applications/Xcode.app/Contents/Developer/usr/lib"; do
+                  if [ -d "$_d/sourcekitdInProc.framework" ]; then
+                    export DYLD_FRAMEWORK_PATH="$_d${DYLD_FRAMEWORK_PATH:+:${DYLD_FRAMEWORK_PATH}}"
+                    break
+                  fi
+                done
+                unset _d
+              }
+
+              # Append to envHostTargetHooks so swiftFixupCCWrapper is called
+              # AFTER ccWrapper_addCVars and bintoolsWrapper_addLDVars.
+              envHostTargetHooks+=(swiftFixupCCWrapper)
               EOF
             '';
 
